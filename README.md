@@ -121,3 +121,4 @@ Site shows "sent to admin / verification in progress"
 | Country code default | `app/page.tsx` → `formatPhone()` function |
 | Success message | `app/page.tsx` → step === "submitted" section |
 # noon-gift
+# noon-gift
