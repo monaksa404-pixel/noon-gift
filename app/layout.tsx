@@ -1,12 +1,12 @@
 // app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
-import ogImage from "@/images/img9.jpeg";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://your-project.vercel.app";
 const shareTitle = "Dash Cameras Oman | Best Price Offers | Muscat, Seeb";
 const shareDescription =
   "Biggest selection of Dash Cameras in Oman ✓ Secure Shopping ✓ Top Brands ✓ Hassle-free Delivery ✓ Free Shipping. Shop Now!";
+const shareImageUrl = `${siteUrl}/api/og-image`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     siteName: "noon",
     images: [
       {
-        url: ogImage.src,
+        url: shareImageUrl,
         width: 310,
         height: 163,
         alt: "Dash Cameras Oman ad preview",
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: shareTitle,
     description: shareDescription,
-    images: [ogImage.src],
+    images: [shareImageUrl],
   },
   icons: {
     icon: "/favicon.ico",
