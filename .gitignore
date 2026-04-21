@@ -1,0 +1,24 @@
+# deps
+/node_modules
+/.pnp
+.pnp.js
+
+# next build
+/.next/
+/out/
+
+# env — NEVER commit this
+.env.local
+.env
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
