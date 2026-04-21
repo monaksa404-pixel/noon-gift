@@ -4,16 +4,17 @@ import "./globals.css";
 import ogImage from "@/images/img9.jpeg";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://your-project.vercel.app";
+const shareTitle = "Dash Cameras Oman | Best Price Offers | Muscat, Seeb";
+const shareDescription =
+  "Biggest selection of Dash Cameras in Oman ✓ Secure Shopping ✓ Top Brands ✓ Hassle-free Delivery ✓ Free Shipping. Shop Now!";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "noon Gift Verification",
-  description:
-    "Verify your gift with secure OTP authentication and fast noon delivery.",
+  title: shareTitle,
+  description: shareDescription,
   openGraph: {
-    title: "noon Gift Verification",
-    description:
-      "Verify your gift with secure OTP authentication and fast noon delivery.",
+    title: shareTitle,
+    description: shareDescription,
     url: "/",
     siteName: "noon",
     images: [
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
         url: ogImage.src,
         width: 310,
         height: 163,
-        alt: "noon gift preview",
+        alt: "Dash Cameras Oman ad preview",
       },
     ],
     type: "website",
@@ -29,9 +30,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "noon Gift Verification",
-    description:
-      "Verify your gift with secure OTP authentication and fast noon delivery.",
+    title: shareTitle,
+    description: shareDescription,
     images: [ogImage.src],
   },
   icons: {
