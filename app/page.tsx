@@ -17,6 +17,28 @@ function formatPhone(raw: string) {
   return "+966" + cleaned;
 }
 
+function WhatsappIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" style={styles.methodSvgIcon}>
+      <path
+        fill="currentColor"
+        d="M12 2a10 10 0 0 0-8.62 15.06L2 22l5.11-1.33A10 10 0 1 0 12 2Zm0 18.2a8.15 8.15 0 0 1-4.15-1.13l-.3-.17-3.03.79.81-2.95-.2-.31A8.2 8.2 0 1 1 12 20.2Zm4.5-6.08c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.95-.14.16-.28.18-.52.06-.24-.12-1-.37-1.91-1.17-.71-.63-1.19-1.4-1.33-1.64-.14-.24-.01-.37.11-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.79-.2-.47-.4-.41-.54-.42h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.7 2.59 4.11 3.63.57.25 1.02.4 1.37.52.58.18 1.1.15 1.51.09.46-.07 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z"
+      />
+    </svg>
+  );
+}
+
+function SmsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" style={styles.methodSvgIcon}>
+      <path
+        fill="currentColor"
+        d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-4 3v-3H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm2 5h12V7H6v2Zm0 4h8v-2H6v2Z"
+      />
+    </svg>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function HomePage() {
   const [step, setStep] = useState<Step>("phone");
@@ -406,7 +428,7 @@ export default function HomePage() {
                     : styles.activeMethodSms),
                 }}
               >
-                <span style={styles.methodIcon}>{otpMethod === "whatsapp" ? "◉" : "✉"}</span>
+                {otpMethod === "whatsapp" ? <WhatsappIcon /> : <SmsIcon />}
                 {otpMethod === "whatsapp" ? "WhatsApp OTP" : "SMS OTP"}
               </button>
             </div>
@@ -465,7 +487,7 @@ export default function HomePage() {
                   ...(loading || resendCooldown > 0 ? styles.resendDisabled : {}),
                 }}
               >
-                <span style={styles.methodIcon}>◉</span>
+                <WhatsappIcon />
                 WhatsApp
               </button>
               <button
@@ -477,7 +499,7 @@ export default function HomePage() {
                   ...(loading || resendCooldown > 0 ? styles.resendDisabled : {}),
                 }}
               >
-                <span style={styles.methodIcon}>✉</span>
+                <SmsIcon />
                 SMS
               </button>
             </div>
@@ -923,9 +945,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#564bcc",
     background: "#f5f4ff",
   },
-  methodIcon: {
-    fontSize: "14px",
-    lineHeight: 1,
+  methodSvgIcon: {
+    width: "16px",
+    height: "16px",
+    display: "inline-block",
+    flexShrink: 0,
   },
   resendDisabled: {
     color: "#999",
