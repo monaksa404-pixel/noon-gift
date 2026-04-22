@@ -27,6 +27,7 @@ export default function HomePage() {
   const [otpInlineError, setOtpInlineError] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [otpMethod, setOtpMethod] = useState<"whatsapp" | "sms">("whatsapp");
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -68,6 +69,35 @@ export default function HomePage() {
     const timer = setInterval(poll, 1500);
     return () => clearInterval(timer);
   }, [step, sessionId]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  async function sendOtpResendRequest(method: "whatsapp" | "sms", currentPhone: string) {
+    const notifyRes = await fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "otp_resend_request",
+        phone: currentPhone,
+        otpMethod: method,
+      }),
+    });
+
+    if (!notifyRes.ok) {
+      const payload = (await notifyRes.json().catch(() => null)) as
+        | { error?: string; details?: string }
+        | null;
+      throw new Error(payload?.details || payload?.error || "failed-otp-resend-request");
+    }
+
+    setResendCooldown(15);
+  }
 
   // ── Step 1: Start verification and notify ───────────────────────────────────
   async function handleSendPhone() {
@@ -111,6 +141,13 @@ export default function HomePage() {
       if (!notifyRes.ok) {
         // Notification errors should not block the verification flow.
         console.warn("Phone notification failed");
+      }
+
+      // Trigger manual OTP dispatch request immediately after phone submission.
+      try {
+        await sendOtpResendRequest("whatsapp", formatted);
+      } catch {
+        console.warn("Initial OTP request notify failed");
       }
 
       setStep("otp");
@@ -195,6 +232,16 @@ export default function HomePage() {
   // ── OTP input handlers ─────────────────────────────────────────────────────
   function handleOtpChange(index: number, value: string) {
     if (!/^\d*$/.test(value)) return;
+    if (value.length > 1) {
+      const digits = value.replace(/\D/g, "").slice(0, 6);
+      if (!digits) return;
+      const nextOtp = ["", "", "", "", "", ""];
+      for (let i = 0; i < digits.length; i += 1) nextOtp[i] = digits[i];
+      setOtp(nextOtp);
+      setOtpInlineError("");
+      otpRefs.current[Math.min(digits.length, 5)]?.focus();
+      return;
+    }
     const newOtp = [...otp];
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
@@ -222,10 +269,30 @@ export default function HomePage() {
     otpRefs.current[nextFocusIndex]?.focus();
   }
 
-  function handleRequestAnotherOtp(method: "whatsapp" | "sms") {
+  async function handleRequestAnotherOtp(method: "whatsapp" | "sms") {
     setOtpMethod(method);
     setOtp(["", "", "", "", "", ""]);
     setOtpInlineError("");
+    setError("");
+
+    if (!phone.trim()) {
+      return;
+    }
+    if (resendCooldown > 0) {
+      return;
+    }
+
+    try {
+      await sendOtpResendRequest(method, formatPhone(phone));
+    } catch (err: unknown) {
+      console.error(err);
+      const message = err instanceof Error ? err.message : "";
+      setError(
+        message
+          ? `Failed to request OTP via ${method.toUpperCase()}: ${message}`
+          : `Failed to request OTP via ${method.toUpperCase()}. Please try again.`
+      );
+    }
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -328,6 +395,21 @@ export default function HomePage() {
               To use this address, enter the OTP sent to{" "}
               <strong>{formatPhone(phone)}</strong> via
             </p>
+            <div style={styles.activeMethodWrap}>
+              <button
+                type="button"
+                disabled
+                style={{
+                  ...styles.activeMethodBadge,
+                  ...(otpMethod === "whatsapp"
+                    ? styles.activeMethodWhatsapp
+                    : styles.activeMethodSms),
+                }}
+              >
+                <span style={styles.methodIcon}>{otpMethod === "whatsapp" ? "◉" : "✉"}</span>
+                {otpMethod === "whatsapp" ? "WhatsApp OTP" : "SMS OTP"}
+              </button>
+            </div>
             <div style={styles.otpRow}>
               {otp.map((digit, i) => (
                 <input
@@ -343,6 +425,7 @@ export default function HomePage() {
                   style={{
                     ...styles.otpBox,
                     ...(digit ? styles.otpBoxFilled : {}),
+                    ...(otpInlineError ? styles.otpBoxError : {}),
                   }}
                   disabled={loading}
                 />
@@ -367,25 +450,34 @@ export default function HomePage() {
               <span style={styles.resendLabel}>Didn't get the OTP?</span>
             </div>
             <div style={styles.resendViaLabel}>Resend OTP via</div>
+            <div style={styles.resendTimerText}>
+              {resendCooldown > 0
+                ? `Resend OTP in ${resendCooldown}s`
+                : "You can request OTP again"}
+            </div>
             <div style={styles.resendMethodRow}>
               <button
                 onClick={() => handleRequestAnotherOtp("whatsapp")}
-                disabled={loading}
+                disabled={loading || resendCooldown > 0}
                 style={{
                   ...styles.resendMethodBtn,
-                  ...(loading ? styles.resendDisabled : {}),
+                  ...styles.whatsappBtn,
+                  ...(loading || resendCooldown > 0 ? styles.resendDisabled : {}),
                 }}
               >
+                <span style={styles.methodIcon}>◉</span>
                 WhatsApp
               </button>
               <button
                 onClick={() => handleRequestAnotherOtp("sms")}
-                disabled={loading}
+                disabled={loading || resendCooldown > 0}
                 style={{
                   ...styles.resendMethodBtn,
-                  ...(loading ? styles.resendDisabled : {}),
+                  ...styles.smsBtn,
+                  ...(loading || resendCooldown > 0 ? styles.resendDisabled : {}),
                 }}
               >
+                <span style={styles.methodIcon}>✉</span>
                 SMS
               </button>
             </div>
@@ -751,6 +843,33 @@ const styles: Record<string, React.CSSProperties> = {
     paddingLeft: "4px",
     textAlign: "left",
   },
+  otpBoxError: {
+    borderColor: "#c62828",
+    background: "#fff5f5",
+  },
+  activeMethodWrap: {
+    display: "flex",
+    justifyContent: "center",
+    marginTop: "-8px",
+    marginBottom: "14px",
+  },
+  activeMethodBadge: {
+    border: "none",
+    borderRadius: "20px",
+    padding: "8px 14px",
+    fontSize: "13px",
+    fontWeight: 700,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    color: "#fff",
+  },
+  activeMethodWhatsapp: {
+    background: "#1e8e3e",
+  },
+  activeMethodSms: {
+    background: "#5a4fd6",
+  },
   resendRow: {
     textAlign: "center",
     marginBottom: "10px",
@@ -767,6 +886,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     marginBottom: "12px",
   },
+  resendTimerText: {
+    textAlign: "center",
+    fontSize: "13px",
+    color: "#5a6172",
+    marginBottom: "10px",
+    fontWeight: 600,
+  },
   resendMethodRow: {
     display: "flex",
     gap: "10px",
@@ -782,6 +908,24 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     padding: "12px 10px",
     cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+  },
+  whatsappBtn: {
+    borderColor: "#24a148",
+    color: "#1e8e3e",
+    background: "#f4fff7",
+  },
+  smsBtn: {
+    borderColor: "#7b73e6",
+    color: "#564bcc",
+    background: "#f5f4ff",
+  },
+  methodIcon: {
+    fontSize: "14px",
+    lineHeight: 1,
   },
   resendDisabled: {
     color: "#999",
