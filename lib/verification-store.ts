@@ -67,7 +67,7 @@ export async function listPendingReviewSessions(
 
   const sessions = await Promise.all(ids.map((id) => getSession(id)));
   return sessions
-    .filter((s): s is VerificationSession => Boolean(s) && s.status === "pending_review")
+    .filter((s): s is VerificationSession => s !== null && s.status === "pending_review")
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, limit);
 }
