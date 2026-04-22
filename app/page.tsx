@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
-import giftPhoneImage from "@/images/img1.png";
+import giftPhoneImage from "@/images/img4.png";
 import promoBanner from "@/images/banner.png";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
