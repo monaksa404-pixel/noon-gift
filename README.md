@@ -4,7 +4,7 @@ A mobile-first Next.js landing page with manual OTP verification through Telegra
 
 ---
 
-## 📁 Project Structure
+## 📁 Project Structures
 
 ```
 noon-gift/
