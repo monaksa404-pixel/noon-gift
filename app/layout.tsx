@@ -2,12 +2,14 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://your-project.vercel.app";
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://noon-gift.vercel.app");
 const shareTitle =
   "noon Online Shopping KSA - Electronics, Mobiles, Fashion, Appliances & More";
 const shareDescription =
-  "Shop online from noon KSA - your one-stop shop for mobiles, electronics, fashion, beauty, groceries & more.";
-const shareImageUrl = `${siteUrl}/og-image.jpg?v=2`;
+  "Shop online from noon KSA - your one-stop shop for mobiles, electronics, fashion, beauty, groceries & more. Enjoy great deals! ✓ Buy Now, Pay Later ✓ Same Day Delivery ✓ Cash on Delivery ✓ Easy Free Returns ✓";
+const shareImageUrl = `${siteUrl}/og-image.jpg`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

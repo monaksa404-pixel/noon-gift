@@ -12,7 +12,8 @@ export async function GET() {
     return new NextResponse(imageBuffer, {
       headers: {
         "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Length": String(imageBuffer.length),
+        "Cache-Control": "public, max-age=86400",
       },
     });
   } catch (error) {
