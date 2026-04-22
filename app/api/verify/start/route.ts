@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSession } from "@/lib/verification-store";
+import { createSession, getLatestSessionByPhone } from "@/lib/verification-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +9,15 @@ export async function POST(req: NextRequest) {
     const { phone } = await req.json();
     if (!phone || typeof phone !== "string") {
       return NextResponse.json({ error: "Phone required" }, { status: 400 });
+    }
+
+    const latestForPhone = await getLatestSessionByPhone(phone);
+    if (latestForPhone?.status === "approved") {
+      return NextResponse.json({
+        success: true,
+        alreadyApproved: true,
+        sessionId: latestForPhone.id,
+      });
     }
 
     const session = await createSession(phone);

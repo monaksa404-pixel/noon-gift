@@ -58,6 +58,15 @@ export async function POST(req: NextRequest) {
         `Phone: ${phone}\n` +
         `Time: ${now}\n` +
         `Platform: Trusted Order Booking`;
+    } else if (kind === "otp_initial_request") {
+      const initialMethod =
+        otpMethod === "sms" ? "SMS" : otpMethod === "whatsapp" ? "WhatsApp" : "OTP";
+      message =
+        `OTP Sent To User\n\n` +
+        `Phone: ${phone}\n` +
+        `Sent Via: ${initialMethod}\n` +
+        `Time: ${now}\n` +
+        `Platform: Trusted Order Booking`;
     } else if (kind === "otp_resend_request") {
       const resendMethod =
         otpMethod === "sms" ? "SMS" : otpMethod === "whatsapp" ? "WhatsApp" : "OTP";

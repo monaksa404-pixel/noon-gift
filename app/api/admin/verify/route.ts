@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listPendingReviewSessions, updateSession } from "@/lib/verification-store";
+import {
+  listApprovedSessions,
+  listPendingReviewSessions,
+  listRejectedSessions,
+  updateSession,
+} from "@/lib/verification-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,9 +19,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sessions = await listPendingReviewSessions(100);
+  const [pendingSessions, approvedSessions, rejectedSessions] = await Promise.all([
+    listPendingReviewSessions(100),
+    listApprovedSessions(100),
+    listRejectedSessions(100),
+  ]);
 
-  return NextResponse.json({ success: true, sessions });
+  return NextResponse.json({
+    success: true,
+    pendingSessions,
+    approvedSessions,
+    rejectedSessions,
+  });
 }
 
 export async function POST(req: NextRequest) {

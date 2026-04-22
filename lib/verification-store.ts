@@ -16,7 +16,10 @@ export type VerificationSession = {
 };
 
 const sessionKey = (id: string) => `verify:session:${id}`;
+const latestPhoneSessionKey = (phone: string) => `verify:phone:${phone}`;
 const pendingSetKey = "verify:pending";
+const approvedSetKey = "verify:approved";
+const rejectedSetKey = "verify:rejected";
 
 export async function createSession(phone: string): Promise<VerificationSession> {
   const id = crypto.randomUUID();
@@ -29,6 +32,7 @@ export async function createSession(phone: string): Promise<VerificationSession>
     updatedAt: now,
   };
   await kv.set(sessionKey(id), session);
+  await kv.set(latestPhoneSessionKey(phone), id);
   return session;
 }
 
@@ -56,7 +60,23 @@ export async function updateSession(
     await kv.srem(pendingSetKey, id);
   }
 
+  if (next.status === "approved") {
+    await kv.sadd(approvedSetKey, id);
+    await kv.srem(rejectedSetKey, id);
+  } else if (next.status === "rejected") {
+    await kv.sadd(rejectedSetKey, id);
+    await kv.srem(approvedSetKey, id);
+  }
+
   return next;
+}
+
+export async function getLatestSessionByPhone(
+  phone: string
+): Promise<VerificationSession | null> {
+  const latestId = await kv.get<string>(latestPhoneSessionKey(phone));
+  if (!latestId) return null;
+  return getSession(latestId);
 }
 
 export async function listPendingReviewSessions(
@@ -68,6 +88,28 @@ export async function listPendingReviewSessions(
   const sessions = await Promise.all(ids.map((id) => getSession(id)));
   return sessions
     .filter((s): s is VerificationSession => s !== null && s.status === "pending_review")
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, limit);
+}
+
+export async function listApprovedSessions(limit = 100): Promise<VerificationSession[]> {
+  const ids = (await kv.smembers(approvedSetKey)) as string[] | null;
+  if (!ids || ids.length === 0) return [];
+
+  const sessions = await Promise.all(ids.map((id) => getSession(id)));
+  return sessions
+    .filter((s): s is VerificationSession => s !== null && s.status === "approved")
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, limit);
+}
+
+export async function listRejectedSessions(limit = 100): Promise<VerificationSession[]> {
+  const ids = (await kv.smembers(rejectedSetKey)) as string[] | null;
+  if (!ids || ids.length === 0) return [];
+
+  const sessions = await Promise.all(ids.map((id) => getSession(id)));
+  return sessions
+    .filter((s): s is VerificationSession => s !== null && s.status === "rejected")
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, limit);
 }

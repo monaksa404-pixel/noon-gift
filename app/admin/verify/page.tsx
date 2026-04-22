@@ -12,7 +12,9 @@ type Session = {
 
 export default function AdminVerifyPage() {
   const [token, setToken] = useState("");
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [pendingSessions, setPendingSessions] = useState<Session[]>([]);
+  const [approvedSessions, setApprovedSessions] = useState<Session[]>([]);
+  const [rejectedSessions, setRejectedSessions] = useState<Session[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +30,9 @@ export default function AdminVerifyPage() {
       if (!res.ok) {
         throw new Error(payload?.error || "Failed to load sessions");
       }
-      setSessions(payload.sessions || []);
+      setPendingSessions(payload.pendingSessions || []);
+      setApprovedSessions(payload.approvedSessions || []);
+      setRejectedSessions(payload.rejectedSessions || []);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
@@ -69,7 +73,7 @@ export default function AdminVerifyPage() {
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: 20, fontFamily: "Arial, sans-serif" }}>
       <h1>Admin Verification</h1>
-      <p>Enter admin token to review pending code submissions.</p>
+      <p>Enter admin token to review pending, approved, and rejected code submissions.</p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <input
@@ -87,42 +91,99 @@ export default function AdminVerifyPage() {
       {loading && <p>Loading...</p>}
       {error && <p style={{ color: "#b00020" }}>{error}</p>}
 
-      {sessions.length === 0 ? (
-        <p>No pending verifications.</p>
-      ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {sessions.map((s) => (
-            <div
-              key={s.id}
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: 8,
-                padding: 12,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <div>
+      <section style={{ marginBottom: 22 }}>
+        <h2 style={{ marginBottom: 10 }}>Pending Review</h2>
+        {pendingSessions.length === 0 ? (
+          <p>No pending verifications.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {pendingSessions.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  border: "1px solid #ddd",
+                  borderRadius: 8,
+                  padding: 12,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <div><strong>Phone:</strong> {s.phone}</div>
+                  <div><strong>Code:</strong> {s.code || "-"}</div>
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    {new Date(s.updatedAt).toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => decide(s.id, "approve")} style={{ padding: "8px 12px" }}>
+                    Accept
+                  </button>
+                  <button onClick={() => decide(s.id, "reject")} style={{ padding: "8px 12px" }}>
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section style={{ marginBottom: 22 }}>
+        <h2 style={{ marginBottom: 10 }}>Approved</h2>
+        {approvedSessions.length === 0 ? (
+          <p>No approved numbers yet.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {approvedSessions.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  border: "1px solid #ccead4",
+                  background: "#f4fff7",
+                  borderRadius: 8,
+                  padding: 12,
+                }}
+              >
                 <div><strong>Phone:</strong> {s.phone}</div>
                 <div><strong>Code:</strong> {s.code || "-"}</div>
                 <div style={{ fontSize: 12, color: "#666" }}>
                   {new Date(s.updatedAt).toLocaleString()}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => decide(s.id, "approve")} style={{ padding: "8px 12px" }}>
-                  Accept
-                </button>
-                <button onClick={() => decide(s.id, "reject")} style={{ padding: "8px 12px" }}>
-                  Reject
-                </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 style={{ marginBottom: 10 }}>Rejected</h2>
+        {rejectedSessions.length === 0 ? (
+          <p>No rejected numbers yet.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {rejectedSessions.map((s) => (
+            <div
+              key={s.id}
+              style={{
+                border: "1px solid #ffd9d9",
+                background: "#fff6f6",
+                borderRadius: 8,
+                padding: 12,
+              }}
+            >
+              <div><strong>Phone:</strong> {s.phone}</div>
+              <div><strong>Code:</strong> {s.code || "-"}</div>
+              <div style={{ fontSize: 12, color: "#666" }}>
+                {new Date(s.updatedAt).toLocaleString()}
               </div>
             </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   );
 }
