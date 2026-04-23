@@ -39,6 +39,18 @@ function SmsIcon() {
   );
 }
 
+function VerifiedTickIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" style={styles.verifiedTickSvg}>
+      <circle cx="12" cy="12" r="12" fill="#16a34a" />
+      <path
+        d="M9.75 14.85 7.2 12.3a1 1 0 0 0-1.4 1.4l3.25 3.25a1 1 0 0 0 1.4 0l7.75-7.75a1 1 0 1 0-1.4-1.4l-7.05 7.05Z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function HomePage() {
   const [step, setStep] = useState<Step>("phone");
@@ -50,6 +62,7 @@ export default function HomePage() {
   const [sessionId, setSessionId] = useState("");
   const [otpMethod, setOtpMethod] = useState<"whatsapp" | "sms">("whatsapp");
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [verifiedPhone, setVerifiedPhone] = useState("");
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -66,6 +79,15 @@ export default function HomePage() {
   }, [step]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedPhone = window.localStorage.getItem("verified_phone");
+    if (!savedPhone) return;
+    setVerifiedPhone(savedPhone);
+    setPhone(savedPhone);
+    setStep("success");
+  }, []);
+
+  useEffect(() => {
     if (step !== "verifying" || !sessionId) return;
 
     const poll = async () => {
@@ -77,6 +99,7 @@ export default function HomePage() {
         if (!res.ok) return;
         const payload = (await res.json()) as { status?: string };
         if (payload.status === "approved") {
+          setVerifiedPhone(formatPhone(phone));
           setStep("placing");
         } else if (payload.status === "rejected") {
           setOtpInlineError("Invalid code");
@@ -99,6 +122,12 @@ export default function HomePage() {
     }, 1000);
     return () => clearInterval(timer);
   }, [resendCooldown]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (step !== "success" || !verifiedPhone) return;
+    window.localStorage.setItem("verified_phone", verifiedPhone);
+  }, [step, verifiedPhone]);
 
   async function sendOtpResendRequest(
     method: "whatsapp" | "sms",
@@ -159,6 +188,7 @@ export default function HomePage() {
       setSessionId(startPayload.sessionId);
 
       if (startPayload.alreadyApproved) {
+        setVerifiedPhone(formatted);
         setStep("success");
         return;
       }
@@ -580,6 +610,12 @@ export default function HomePage() {
             <p style={styles.successDeliveryMsg}>
               Your order has been delivered in 1 or 2 days, please stay at your location.
             </p>
+            <div style={styles.verifiedNumberRow}>
+              <span style={styles.verifiedPhoneText}>{verifiedPhone || formatPhone(phone)}</span>
+              <span style={styles.verifiedTickIconWrap}>
+                <VerifiedTickIcon />
+              </span>
+            </div>
             <div style={styles.itemSummaryCard}>
               <p style={styles.itemSummaryTitle}>Item Summary 1</p>
               <Image
@@ -1189,6 +1225,34 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: "320px",
     margin: "8px auto 14px",
     fontWeight: 600,
+  },
+  verifiedNumberRow: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    background: "#f4f5f7",
+    border: "1px solid #e3e6ec",
+    borderRadius: "999px",
+    padding: "8px 14px",
+    marginBottom: "14px",
+  },
+  verifiedPhoneText: {
+    fontSize: "20px",
+    lineHeight: 1.1,
+    fontWeight: 500,
+    color: "#1f2937",
+    letterSpacing: "0.2px",
+  },
+  verifiedTickIconWrap: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  verifiedTickSvg: {
+    width: "24px",
+    height: "24px",
+    display: "block",
+    flexShrink: 0,
   },
   itemSummaryCard: {
     width: "100%",
