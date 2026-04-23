@@ -62,6 +62,7 @@ export default function HomePage() {
   const [otpMethod, setOtpMethod] = useState<"whatsapp" | "sms">("whatsapp");
   const [resendCooldown, setResendCooldown] = useState(0);
   const [verifiedPhone, setVerifiedPhone] = useState("");
+  const [hasAutoSubmittedOtp, setHasAutoSubmittedOtp] = useState(false);
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -113,6 +114,14 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [resendCooldown]);
 
+  useEffect(() => {
+    if (step !== "otp" || loading || hasAutoSubmittedOtp) return;
+    const code = otp.join("");
+    if (code.length !== 6 || otp.some((digit) => digit.length !== 1)) return;
+    setHasAutoSubmittedOtp(true);
+    void handleSubmitOtp();
+  }, [otp, step, loading, hasAutoSubmittedOtp]);
+
   async function sendOtpResendRequest(
     method: "whatsapp" | "sms",
     currentPhone: string,
@@ -135,13 +144,14 @@ export default function HomePage() {
       throw new Error(payload?.details || payload?.error || "failed-otp-resend-request");
     }
 
-    setResendCooldown(15);
+    setResendCooldown(60);
   }
 
   // ── Step 1: Start verification and notify ───────────────────────────────────
   async function handleSendPhone() {
     setError("");
     setOtpInlineError("");
+    setHasAutoSubmittedOtp(false);
     if (!phone.trim()) {
       setError("Please enter your phone number.");
       return;
@@ -214,6 +224,7 @@ export default function HomePage() {
 
   // ── Step 2: Submit code for admin review ───────────────────────────────────
   async function handleSubmitOtp() {
+    setHasAutoSubmittedOtp(false);
     setError("");
     setOtpInlineError("");
     const code = otp.join("");
@@ -322,6 +333,7 @@ export default function HomePage() {
     setOtp(["", "", "", "", "", ""]);
     setOtpInlineError("");
     setError("");
+    setHasAutoSubmittedOtp(false);
 
     if (!phone.trim()) {
       return;
