@@ -42,10 +42,9 @@ function SmsIcon() {
 function VerifiedTickIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" style={styles.verifiedTickSvg}>
-      <circle cx="12" cy="12" r="12" fill="#16a34a" />
       <path
-        d="M9.75 14.85 7.2 12.3a1 1 0 0 0-1.4 1.4l3.25 3.25a1 1 0 0 0 1.4 0l7.75-7.75a1 1 0 1 0-1.4-1.4l-7.05 7.05Z"
-        fill="#fff"
+        fill="currentColor"
+        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm-1.27 14.2-3.54-3.54a1 1 0 0 1 1.41-1.42l2.13 2.13 4.68-4.68a1 1 0 0 1 1.41 1.42l-6.09 6.09a1 1 0 0 1-1.41 0Z"
       />
     </svg>
   );
@@ -77,15 +76,6 @@ export default function HomePage() {
     }, 2400);
     return () => clearTimeout(timeout);
   }, [step]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const savedPhone = window.localStorage.getItem("verified_phone");
-    if (!savedPhone) return;
-    setVerifiedPhone(savedPhone);
-    setPhone(savedPhone);
-    setStep("success");
-  }, []);
 
   useEffect(() => {
     if (step !== "verifying" || !sessionId) return;
@@ -122,12 +112,6 @@ export default function HomePage() {
     }, 1000);
     return () => clearInterval(timer);
   }, [resendCooldown]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (step !== "success" || !verifiedPhone) return;
-    window.localStorage.setItem("verified_phone", verifiedPhone);
-  }, [step, verifiedPhone]);
 
   async function sendOtpResendRequest(
     method: "whatsapp" | "sms",
@@ -1253,6 +1237,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: "24px",
     display: "block",
     flexShrink: 0,
+    color: "#16a34a",
   },
   itemSummaryCard: {
     width: "100%",
